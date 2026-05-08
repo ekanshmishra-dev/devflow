@@ -50,11 +50,24 @@ app.use('/api/ai', aiLimiter);
 
 // Basic route
 app.get('/', (req, res) => {
-    res.send('AI-Enhanced Task Management Backend is running');
+    res.json({
+        status: 'healthy',
+        service: 'DevFlow API',
+        version: '1.0.0',
+        uptime: process.uptime(),
+        endpoints: {
+            auth: '/api/auth',
+            projects: '/api/projects',
+            tasks: '/api/tasks',
+            ai: '/api/ai'
+        },
+        timestamp: new Date().toISOString()
+    });
 });
 
 // App Routes
 app.use('/api/auth', require('./src/routes/auth'));
+app.use('/api/projects', require('./src/routes/projects'));
 app.use('/api/tasks', require('./src/routes/tasks'));
 app.use('/api/ai', require('./src/routes/ai'));
 
