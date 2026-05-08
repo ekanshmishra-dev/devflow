@@ -50,7 +50,7 @@ app.use('/api/ai', aiLimiter);
 
 // Basic route
 app.get('/', (req, res) => {
-    res.json({
+    const statusData = {
         status: 'healthy',
         service: 'DevFlow API',
         version: '1.0.0',
@@ -62,7 +62,76 @@ app.get('/', (req, res) => {
             ai: '/api/ai'
         },
         timestamp: new Date().toISOString()
-    });
+    };
+
+    const jsonStr = JSON.stringify(statusData, null, 2);
+
+    res.send(`
+        <!DOCTYPE html>
+        <html lang="en">
+        <head>
+            <meta charset="UTF-8">
+            <meta name="viewport" content="width=device-width, initial-scale=1.0">
+            <title>DevFlow API Status</title>
+            <style>
+                body {
+                    background: radial-gradient(circle at top left, #1e293b, #0f172a);
+                    color: #e2e8f0;
+                    font-family: 'Inter', system-ui, -apple-system, sans-serif;
+                    display: flex;
+                    justify-content: center;
+                    align-items: center;
+                    min-height: 100vh;
+                    margin: 0;
+                }
+                .container {
+                    background: rgba(30, 41, 59, 0.5);
+                    backdrop-filter: blur(10px);
+                    border: 1px solid rgba(255, 255, 255, 0.1);
+                    border-radius: 1rem;
+                    padding: 2rem;
+                    box-shadow: 0 25px 50px -12px rgba(0, 0, 0, 0.25);
+                    max-width: 600px;
+                    width: 90%;
+                }
+                h1 {
+                    font-size: 1.5rem;
+                    margin-bottom: 1rem;
+                    color: #38bdf8;
+                    display: flex;
+                    align-items: center;
+                    gap: 0.5rem;
+                }
+                h1::before {
+                    content: '';
+                    display: inline-block;
+                    width: 12px;
+                    height: 12px;
+                    background: #10b981;
+                    border-radius: 50%;
+                    box-shadow: 0 0 10px #10b981;
+                }
+                pre {
+                    background: #0b1329;
+                    padding: 1.5rem;
+                    border-radius: 0.75rem;
+                    border: 1px solid #1e293b;
+                    overflow-x: auto;
+                    color: #a7f3d0;
+                    font-family: 'Fira Code', 'Courier New', monospace;
+                    font-size: 0.9rem;
+                    line-height: 1.5;
+                }
+            </style>
+        </head>
+        <body>
+            <div class="container">
+                <h1>DevFlow API Status</h1>
+                <pre>${jsonStr}</pre>
+            </div>
+        </body>
+        </html>
+    `);
 });
 
 // App Routes
