@@ -1,121 +1,74 @@
-const ANTHROPIC_API_KEY = process.env.ANTHROPIC_API_KEY;
-const API_URL = 'https://api.anthropic.com/v1/messages';
-const MODEL = 'claude-sonnet-4-20250514';
+const { GoogleGenerativeAI } = require('@google/generative-ai');
 
-/**
- * Core helper to make a fetch call to Anthropic and parse the resulting JSON cleanly.
- */
-const callAnthropicAPI = async (prompt) => {
-    if (!ANTHROPIC_API_KEY) {
-        throw new Error("ANTHROPIC_API_KEY is not defined in the environment variables.");
-    }
+const genAI = new GoogleGenerativeAI(process.env.GEMINI_API_KEY);
+const model = genAI.getGenerativeModel({ model: 'gemini-1.5-flash' });
 
-    try {
-        const response = await fetch(API_URL, {
-            method: 'POST',
-            headers: {
-                'Content-Type': 'application/json',
-                'x-api-key': ANTHROPIC_API_KEY,
-                'anthropic-version': '2023-06-01'
-            },
-            body: JSON.stringify({
-                model: MODEL,
-                max_tokens: 1500,
-                messages: [
-                    { role: 'user', content: prompt }
-                ]
-            })
-        });
-
-        if (!response.ok) {
-            const errorText = await response.text();
-            throw new Error(`Anthropic API error: ${response.status} - ${errorText}`);
-        }
-
-        const data = await response.json();
-        const textResponse = data.content?.[0]?.text;
-
-        if (!textResponse) {
-            throw new Error('Received empty text from Anthropic API');
-        }
-
-        // Try to parse the response safely: Claude sometimes wraps JSON block in markdown
-        const jsonMatch = textResponse.match(/```(?:json)?\s*([\s\S]*?)\s*```/i);
-        const jsonString = jsonMatch ? jsonMatch[1].trim() : textResponse.trim();
-
-        try {
-            return JSON.parse(jsonString);
-        } catch (parseError) {
-            console.error('Failed to parse AI JSON:', jsonString);
-            throw new Error('Failed to parse AI response as JSON');
-        }
-    } catch (error) {
-        console.error('Error invoking Anthropic AI:', error);
-        throw error;
-    }
+const callGemini = async (prompt) => {
+  const result = await model.generateContent(prompt);
+  return result.response.text();
 };
 
-const generateSubtasks = async (taskDescription) => {
-    const prompt = `You are a strict task breakdown assistant system. Process the following task description and generate 3 to 5 logical subtasks.
-You MUST reply ONLY with a valid JSON array, without any conversational text before or after.
-Each object in the array must exactly have:
-- "title": a short string describing the subtask
-- "description": a string with more details about how to complete it
+exports.generateSubtasks = async (taskTitle, taskDescription) => {
+  const prompt = `Given this task:
+Title: "${taskTitle}"
+Description: "${taskDescription}"
 
-Task Description:
-${taskDescription}`;
+Generate 3-5 subtasks. Return ONLY valid JSON array, no markdown:
+[{"title": "subtask title", "description": "what to do"}]`;
 
-    return await callAnthropicAPI(prompt);
+  const response = await callGemini(prompt);
+  const clean = response.replace(/```json|```/g, '').trim();
+  return JSON.parse(clean);
 };
 
-const analyzeCode = async (code, language) => {
-    const prompt = `You are a strict code review system. Analyze the following ${language} code.
-You MUST reply ONLY with valid JSON, without any conversational text before or after.
-The JSON object must exactly have:
-- "quality_score": an integer from 1 to 10 evaluating the overall quality
-- "issues": an array of strings listing bugs, anti-patterns, or architectural flaws
-- "suggestions": an array of strings listing improvements
-
-Code to analyze:
+exports.analyzeCode = async (code, language) => {
+  const prompt = `Review this ${language} code:
 \`\`\`${language}
 ${code}
-\`\`\``;
+\`\`\`
+Return ONLY valid JSON, no markdown:
+{"quality_score": 7, "issues": ["issue1"], "suggestions": ["suggestion1"], "summary": "overall assessment"}`;
 
-    return await callAnthropicAPI(prompt);
+  const response = await callGemini(prompt);
+  const clean = response.replace(/```json|```/g, '').trim();
+  return JSON.parse(clean);
 };
 
-const suggestPriority = async (title, description, projectContext) => {
-    const prompt = `You are a strict AI technical project manager system. Calculate the priority of the given task in the provided project context.
-You MUST reply ONLY with valid JSON, without any conversational text before or after.
-The JSON object must exactly have:
-- "priority": exactly one of the strings "low", "medium", "high", or "critical"
-- "estimatedHours": a number estimating how long the task will take
-- "reasoning": a brief string explaining your logic
+exports.suggestPriority = async (taskTitle, taskDescription, projectContext) => {
+  const prompt = `Analyze this task:
+Title: "${taskTitle}"
+Description: "${taskDescription}"
+Project: "${projectContext}"
 
-Task Title: ${title}
-Task Description: ${description}
-Project Context: ${projectContext}`;
+Return ONLY valid JSON, no markdown:
+{"priority": "high", "estimatedHours": 4, "reasoning": "explanation"}`;
 
-    return await callAnthropicAPI(prompt);
+  const response = await callGemini(prompt);
+  const clean = response.replace(/```json|```/g, '').trim();
+  return JSON.parse(clean);
 };
 
-const parseMeetingNotes = async (notes) => {
-    const prompt = `You are a strict action-item extraction AI. Extract all tasks and action items from the provided meeting notes.
-You MUST reply ONLY with a valid JSON array, without any conversational text before or after.
-Each object in the array must exactly have:
-- "title": a string describing the extracted task
-- "assignee": a string name of the person responsible, or null if no one is explicitly assigned
-- "dueDate": a string in "YYYY-MM-DD" format if a deadline is mentioned, or null
+exports.parseMeetingNotes = async (meetingNotes) => {
+  const prompt = `Extract action items from these meeting notes:
+"${meetingNotes}"
 
-Meeting Notes:
-${notes}`;
+Return ONLY valid JSON array, no markdown:
+[{"title": "task title", "description": "details", "assignee": "name or null", "dueDate": "YYYY-MM-DD or null"}]`;
 
-    return await callAnthropicAPI(prompt);
+  const response = await callGemini(prompt);
+  const clean = response.replace(/```json|```/g, '').trim();
+  return JSON.parse(clean);
 };
 
-module.exports = {
-    generateSubtasks,
-    analyzeCode,
-    suggestPriority,
-    parseMeetingNotes
+exports.naturalLanguageSearch = async (naturalQuery) => {
+  const prompt = `Convert this to MongoDB query for task management:
+"${naturalQuery}"
+Fields: title, status(todo/in-progress/review/done), priority(low/medium/high/critical), tags
+
+Return ONLY valid JSON MongoDB query, no markdown:
+{"status": "in-progress"}`;
+
+  const response = await callGemini(prompt);
+  const clean = response.replace(/```json|```/g, '').trim();
+  return JSON.parse(clean);
 };

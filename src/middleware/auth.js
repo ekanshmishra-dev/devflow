@@ -12,7 +12,7 @@ const auth = async (req, res, next) => {
         const token = authHeader.replace('Bearer ', '');
         const decoded = jwt.verify(token, process.env.JWT_SECRET);
 
-        const user = await User.findById(decoded.id).select('-password');
+        const user = await User.findById(decoded.id || decoded._id || decoded.userId).select('-password');
         if (!user) {
             throw new Error();
         }
